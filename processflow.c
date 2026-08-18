@@ -1,14 +1,35 @@
 #include <stdio.h>
+#include <string.h>
 
-int main() {
+int main()
+{
 
     char linha[256];
 
-    printf("processflow> ");
-    fflush(stdout);
-    fgets(linha, sizeof(linha), stdin);
+    while (1)
+    {
 
-    printf("%s", linha);
+        printf("processflow> ");
+        fflush(stdout);
+
+        if(fgets(linha, sizeof(linha), stdin) == NULL)
+        {
+            break;
+        }
+
+        linha[strcspn(linha, "\n")] = '\0';
+
+        if (strcmp(linha, "exit") == 0)
+        {
+            break;
+        }
+
+        if (linha[0] == '\0')
+        {
+            continue;
+        }
+
+    }
 
     return 0;
 }
