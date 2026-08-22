@@ -14,7 +14,8 @@ int main(int argc, char *argv[])
         entrada = fopen(argv[1], "r");
         if (entrada == NULL)
         {
-            printf("ERRO: Arquivo esta em uma crise de vazio imensuravel");
+            printf("processflow: nao foi possivel abrir o arquivo\n");
+            printf("Uso: ./processflow [workflowFile\n");
             return 1;
         }
         interativo = 0;
@@ -22,7 +23,7 @@ int main(int argc, char *argv[])
 
     else if (argc > 2)
     {
-        printf("ERRO: Argumentos astronomicos...");
+        printf("processflow: muitos argumentos");
         return 1;
     }
 
