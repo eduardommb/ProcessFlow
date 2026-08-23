@@ -1,13 +1,33 @@
 #include <stdio.h>
 #include <string.h>
 
+int parse(char *linha, char **tokens, int max)
+{
+    int i = 0;
+    char *token;
+    char *saveptr = NULL;
+
+    token = strtok_r(linha, " ", &saveptr);
+    while (token != NULL)
+    {
+        if (i >= max)
+        {
+            break;
+        }
+        tokens[i] = token;
+        i++;
+        token = strtok_r(NULL, " ", &saveptr);
+    }
+
+    return i;
+}
+
 int main(int argc, char *argv[])
 {
+    char linha[256];
     FILE *entrada = stdin;
     int interativo = 1;
-
-    char linha[256];
-
+    char *tokens[64];
 
     if (argc == 2)
     {
@@ -15,7 +35,7 @@ int main(int argc, char *argv[])
         if (entrada == NULL)
         {
             printf("processflow: nao foi possivel abrir o arquivo\n");
-            printf("Uso: ./processflow [workflowFile\n");
+            printf("Uso: ./processflow [workflowFile]\n");
             return 1;
         }
         interativo = 0;
@@ -23,7 +43,7 @@ int main(int argc, char *argv[])
 
     else if (argc > 2)
     {
-        printf("processflow: muitos argumentos");
+        printf("processflow: muitos argumentos\n");
         return 1;
     }
 
@@ -42,6 +62,11 @@ int main(int argc, char *argv[])
         }
 
         linha[strcspn(linha, "\n")] = '\0';
+        if(!interativo)
+        {
+            printf("%s\n", linha);
+        }
+
         if (strcmp(linha, "exit") == 0)
         {
             break;
@@ -52,10 +77,18 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        if(!interativo)
+        int n = parse(linha, tokens, 64);
+
+        if (n == 0)
         {
-            printf("%s\n", linha);
+            continue;
         }
+
+        for (int j = 0; j < n; j++)
+        {
+            printf("token %d: [%s]\n", j, tokens[j]);
+        }
+
     }
 
     if (entrada != stdin) {
