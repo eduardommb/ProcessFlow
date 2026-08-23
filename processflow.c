@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 typedef struct Tarefa {
     char *nome;
@@ -108,6 +109,35 @@ pid_t lancar(Tarefa *t)
     }
     else if (pid == 0)
     {
+        if (t->input != NULL)
+        {
+            int fd_in = open(t->input, O_RDONLY);
+
+            if (fd_in < 0)
+            {
+                printf("processflow: nao foi possivel abrir entrada '%s'\n", t->input);
+                _exit(1);
+            }
+
+            dup2(fd_in, STDIN_FILENO);
+            close(fd_in);
+        }
+
+        if (t->output != NULL)
+        {
+            int flags = O_WRONLY | O_CREAT | (t->append ? O_APPEND : O_TRUNC);
+            int fd_out = open(t->output, flags, 0644);
+
+            if (fd_out < 0)
+            {
+                printf("processflow: nao foi possivel abrir saida '%s'\n", t->output);
+                _exit(1);
+            }
+
+            dup2(fd_out, STDOUT_FILENO);
+            close(fd_out);
+        }
+
         execvp(t->programa, t->args);
 
         printf("processflow: nao foi possivel executar '%s'\n", t->programa);
@@ -290,6 +320,36 @@ int main(int argc, char *argv[])
             else
             {
                 printf("uso: run <tarefa> | run sequential <t1> [t2...] | run parallel <t1> [t2...]");
+            }
+        }
+
+        else if (strcmp(tokens[0], "input") == 0 || strcmp(tokens[0], "output") == 0 || strcmp(tokens[0], "append") == 0)
+        {
+            if (n != 3)
+            {
+                printf("uso: %s <tarefa> <arquivo>\n", tokens[0]);
+            }
+            else
+            {
+                Tarefa *t = buscar(tokens[1]);
+
+                if (t == NULL)
+                {
+                    printf("processflow: tarefa '%s' nao existe\n", tokens[1]);
+                }
+                else if (strcmp(tokens[0], "input") == 0)
+                {
+                    free(t->input);
+                    t->input = strdup(tokens[2]);
+                    printf("Tarefa '%s': entrada <- %s\n", t->nome, t->input);
+                }
+                else
+                {
+                    free(t->output);
+                    t->output = strdup(tokens[2]);
+                    t->append = (strcmp(tokens[0], "append") == 0);
+                    printf("Tarefa '%s': saida -> %s (%s)\n", t->nome, t->output, t->append ? "append" : "sobrescreve");
+                }
             }
         }
 
