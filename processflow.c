@@ -133,6 +133,57 @@ void executar(Tarefa *t)
     }
 }
 
+void executar_sequencial(char **nomes, int qtd)
+{
+    for (int j = 0; j < qtd; j++)
+    {
+        Tarefa *t = buscar(nomes[j]);
+
+        if (t == NULL)
+        {
+            printf("processflow: tarefa '%s' nao existe\n", nomes[j]);
+            continue;
+        }
+
+        executar(t);
+    }
+}
+
+void executar_paralelo(char **nomes, int qtd)
+{
+    pid_t pids[MAX_TAREFAS];
+
+    for (int j = 0; j < qtd; j++)
+    {
+        Tarefa *t = buscar(nomes[j]);
+
+        if (t == NULL)
+        {
+            printf("processflow: tarefa '%s' nao existe\n", nomes[j]);
+            pids[j] = -1;
+            continue;
+        }
+
+        pids[j] = lancar(t);
+    }
+
+    for (int j = 0; j < qtd; j++)
+    {
+        if (pids[j] <= 0)
+        {
+            continue;
+        }
+
+        int status;
+        waitpid(pids[j], &status, 0);
+
+        if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+        {
+            printf("processflow: tarefa '%s' terminou com codigo %d\n", nomes[j], WEXITSTATUS(status));
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
     char linha[256];
@@ -213,14 +264,20 @@ int main(int argc, char *argv[])
 
         else if (strcmp(tokens[0], "run") == 0)
         {
-            if (n != 2)
+            int modo_sequencial = (n >= 2 && strcmp(tokens[1], "sequential") == 0);
+            int modo_paralelo = (n >= 2 && strcmp(tokens[1], "parallel") == 0);
+
+            if (modo_sequencial && n >= 3)
             {
-                printf("uso: run <tarefa>\n");
+                executar_sequencial(&tokens[2], n - 2);
             }
-            else
+            else if (modo_paralelo && n >= 3)
+            {
+                executar_paralelo(&tokens[2], n - 2);
+            }
+            else if (!modo_sequencial && !modo_paralelo && n == 2)
             {
                 Tarefa *t = buscar(tokens[1]);
-
                 if (t == NULL)
                 {
                     printf("processflow: tarefa '%s' nao existe\n", tokens[1]);
@@ -229,6 +286,10 @@ int main(int argc, char *argv[])
                 {
                     executar(t);
                 }
+            }
+            else
+            {
+                printf("uso: run <tarefa> | run sequential <t1> [t2...] | run parallel <t1> [t2...]");
             }
         }
 
