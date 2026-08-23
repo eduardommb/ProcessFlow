@@ -1,5 +1,22 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+typedef struct Tarefa {
+    char *nome;
+    char *programa;
+    char **args;
+    int num_args;
+    char *input;
+    char *output;
+    int append;
+} Tarefa;
+
+#define MAX_TAREFAS 64
+#define MAX_ARGS 32
+
+Tarefa tarefas[MAX_TAREFAS];
+int ntarefas = 0;
 
 int parse(char *linha, char **tokens, int max)
 {
@@ -20,6 +37,50 @@ int parse(char *linha, char **tokens, int max)
     }
 
     return i;
+}
+
+int cadastrar(char **tokens, int n)
+{
+    if(n < 3)
+    {
+        printf("uso: task <nome> <programa> [argumentos...]\n");
+        return -1;
+    }
+
+    for (int i = 0; i < ntarefas; i++)
+    {
+        if (strcmp(tarefas[i].nome, tokens[1]) == 0)
+        {
+            printf("processflow: tarefa '%s' ja existe\n", tokens[1]);
+            return -1;
+        }
+    }
+
+    if (ntarefas >= MAX_TAREFAS) {
+        printf("processflow: erro. numero maximo de tarefas excedido");
+        return -1;
+    }
+
+    Tarefa *t = &tarefas[ntarefas];
+    t->nome = strdup(tokens[1]);
+    t->programa = strdup(tokens[2]);
+
+    t->num_args = n - 3;
+    t->args = malloc((t->num_args + 2) * sizeof(char *));
+    t->args[0] = strdup(tokens[2]);
+    for (int i = 0; i < t->num_args; i++)
+    {
+        t->args[i + 1] = strdup(tokens[3 + i]);
+    }
+    t->args[t->num_args + 1] = NULL;
+
+    t->input = NULL;
+    t->output = NULL;
+    t->append = 0;
+
+    ntarefas++;
+    return 0;
+
 }
 
 int main(int argc, char *argv[])
@@ -84,9 +145,25 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        for (int j = 0; j < n; j++)
+        if (strcmp(tokens[0], "task") == 0)
         {
-            printf("token %d: [%s]\n", j, tokens[j]);
+            if (cadastrar(tokens, n) == 0)
+            {
+                printf("Tarefa '%s' cadastrada\n", tokens[1]);
+            }
+        }
+
+        else if (strcmp(tokens[0], "list") == 0)
+        {
+            for (int i = 0; i < ntarefas; i++)
+            {
+                printf("%d: %s -> %s\n", i, tarefas[i].nome, tarefas[i].programa);
+            }
+        }
+
+        else
+        {
+            printf("processflow: comando desconhecido '%s'\n", tokens[0]);
         }
 
     }
