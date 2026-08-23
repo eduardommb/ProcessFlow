@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 typedef struct Tarefa {
     char *nome;
@@ -57,7 +59,7 @@ int cadastrar(char **tokens, int n)
     }
 
     if (ntarefas >= MAX_TAREFAS) {
-        printf("processflow: erro. numero maximo de tarefas excedido");
+        printf("processflow: erro. numero maximo de tarefas excedido\n");
         return -1;
     }
 
@@ -81,6 +83,45 @@ int cadastrar(char **tokens, int n)
     ntarefas++;
     return 0;
 
+}
+
+Tarefa *buscar(char *nome)
+{
+    for (int i = 0; i < ntarefas; i++)
+    {
+        if (strcmp(tarefas[i].nome, nome) == 0)
+        {
+            return &tarefas[i];
+        }
+    }
+    return NULL;
+}
+
+void executar(Tarefa *t)
+{
+    pid_t pid = fork();
+
+    if (pid < 0)
+    {
+        printf("processflow: fork falhou\n");
+    }
+    else if (pid == 0)
+    {
+        execvp(t->programa, t->args);
+
+        printf("processflow: nao foi possivel executar '%s'\n", t->programa);
+        _exit(127);
+    }
+    else
+    {
+        int status;
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+        {
+            printf("processflow: tarefa '%s' terminou com codigo %d\n", t->nome, WEXITSTATUS(status));
+        }
+    }
 }
 
 int main(int argc, char *argv[])
@@ -158,6 +199,27 @@ int main(int argc, char *argv[])
             for (int i = 0; i < ntarefas; i++)
             {
                 printf("%d: %s -> %s\n", i, tarefas[i].nome, tarefas[i].programa);
+            }
+        }
+
+        else if (strcmp(tokens[0], "run") == 0)
+        {
+            if (n != 2)
+            {
+                printf("uso: run <tarefa>\n");
+            }
+            else
+            {
+                Tarefa *t = buscar(tokens[1]);
+
+                if (t == NULL)
+                {
+                    printf("processflow: tarefa '%s' nao existe\n", tokens[1]);
+                }
+                else
+                {
+                    executar(t);
+                }
             }
         }
 
