@@ -97,13 +97,14 @@ Tarefa *buscar(char *nome)
     return NULL;
 }
 
-void executar(Tarefa *t)
+pid_t lancar(Tarefa *t)
 {
     pid_t pid = fork();
 
     if (pid < 0)
     {
         printf("processflow: fork falhou\n");
+        return -1;
     }
     else if (pid == 0)
     {
@@ -112,7 +113,15 @@ void executar(Tarefa *t)
         printf("processflow: nao foi possivel executar '%s'\n", t->programa);
         _exit(127);
     }
-    else
+
+    return pid;
+}
+
+void executar(Tarefa *t)
+{
+    pid_t pid = lancar(t);
+
+    if (pid > 0)
     {
         int status;
         waitpid(pid, &status, 0);
