@@ -54,17 +54,3 @@ list                                     lista as tarefas cadastradas (auxiliar)
 exit                                     encerra
 ```
 
-## Como testar
-
-Com os arquivos fornecidos em `testes/`:
-
-```sh
-./processflow < testes/teste1/teste1-entrada.txt > /tmp/s1.txt
-diff /tmp/s1.txt testes/teste1/teste1-saida.txt
-
-./processflow < testes/teste2/teste2-entrada.txt > /tmp/s2.txt
-diff /tmp/s2.txt testes/teste2/teste2-saida.txt
-
-./processflow testes/teste3/teste3-entrada.txt > /tmp/s3.txt
-diff /tmp/s3.txt testes/teste3/teste3-saida.txt
-```
