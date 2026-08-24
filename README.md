@@ -68,6 +68,3 @@ diff /tmp/s2.txt testes/teste2/teste2-saida.txt
 ./processflow testes/teste3/teste3-entrada.txt > /tmp/s3.txt
 diff /tmp/s3.txt testes/teste3/teste3-saida.txt
 ```
-
-Observação: os arquivos de saída esperada não terminam com `\n`; o conteúdo
-produzido é idêntico, diferindo apenas dessa quebra de linha final.
