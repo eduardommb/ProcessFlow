@@ -100,6 +100,7 @@ Tarefa *buscar(char *nome)
 
 pid_t lancar(Tarefa *t)
 {
+    fflush(stdout);
     pid_t pid = fork();
 
     if (pid < 0)
@@ -214,6 +215,126 @@ void executar_paralelo(char **nomes, int qtd)
     }
 }
 
+void executar_pipe(char **nomes, int qtd)
+{
+    if (qtd < 2)
+    {
+        printf("uso: run pipe <t1> <t2> ...\n");
+        return;
+    }
+
+    for (int j = 0; j < qtd; j++)
+    {
+        if (buscar(nomes[j]) == NULL)
+        {
+            printf("processflow: tarefa '%s' nao existe\n", nomes[j]);
+            return;
+        }
+    }
+
+    int npipes = qtd - 1;
+    int fds[MAX_TAREFAS][2];
+    pid_t pids[MAX_TAREFAS];
+
+    for (int i = 0; i < npipes; i++)
+    {
+        if (pipe(fds[i]) < 0)
+        {
+            printf("processflow: pipe falhou\n");
+            return;
+        }
+    }
+
+    for (int j = 0; j < qtd; j++)
+    {
+        Tarefa *t = buscar(nomes[j]);
+
+        fflush(stdout);
+        pid_t pid = fork();
+
+        if (pid < 0)
+        {
+            printf("processflow: fork falhou\n");
+            pids[j] = -1;
+            continue;
+        }
+
+        if (pid == 0)
+        {
+            /* entrada: pipe anterior; so a primeira tarefa pode usar arquivo */
+            if (j > 0)
+            {
+                dup2(fds[j - 1][0], STDIN_FILENO);
+            }
+            else if (t->input != NULL)
+            {
+                int fd_in = open(t->input, O_RDONLY);
+                if (fd_in < 0)
+                {
+                    printf("processflow: nao foi possivel abrir entrada '%s'\n", t->input);
+                    _exit(1);
+                }
+                dup2(fd_in, STDIN_FILENO);
+                close(fd_in);
+            }
+
+            /* saida: proximo pipe; so a ultima tarefa pode usar arquivo */
+            if (j < qtd - 1)
+            {
+                dup2(fds[j][1], STDOUT_FILENO);
+            }
+            else if (t->output != NULL)
+            {
+                int flags = O_WRONLY | O_CREAT | (t->append ? O_APPEND : O_TRUNC);
+                int fd_out = open(t->output, flags, 0644);
+                if (fd_out < 0)
+                {
+                    printf("processflow: nao foi possivel abrir saida '%s'\n", t->output);
+                    _exit(1);
+                }
+                dup2(fd_out, STDOUT_FILENO);
+                close(fd_out);
+            }
+
+            /* regra de ouro: fechar TODAS as pontas de TODOS os pipes */
+            for (int k = 0; k < npipes; k++)
+            {
+                close(fds[k][0]);
+                close(fds[k][1]);
+            }
+
+            execvp(t->programa, t->args);
+            printf("processflow: nao foi possivel executar '%s'\n", t->programa);
+            _exit(127);
+        }
+
+        pids[j] = pid;
+    }
+
+    /* pai tambem fecha tudo: senao a ultima tarefa nunca recebe EOF */
+    for (int k = 0; k < npipes; k++)
+    {
+        close(fds[k][0]);
+        close(fds[k][1]);
+    }
+
+    for (int j = 0; j < qtd; j++)
+    {
+        if (pids[j] <= 0)
+        {
+            continue;
+        }
+
+        int status;
+        waitpid(pids[j], &status, 0);
+
+        if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+        {
+            printf("processflow: tarefa '%s' terminou com codigo %d\n", nomes[j], WEXITSTATUS(status));
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
     char linha[256];
@@ -242,7 +363,7 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-        if(interativo)
+        if(interativo && isatty(STDIN_FILENO))
         {
             printf("processflow> ");
             fflush(stdout);
@@ -257,6 +378,7 @@ int main(int argc, char *argv[])
         if(!interativo)
         {
             printf("%s\n", linha);
+            fflush(stdout);
         }
 
         if (strcmp(linha, "exit") == 0)
@@ -278,10 +400,7 @@ int main(int argc, char *argv[])
 
         if (strcmp(tokens[0], "task") == 0)
         {
-            if (cadastrar(tokens, n) == 0)
-            {
-                printf("Tarefa '%s' cadastrada\n", tokens[1]);
-            }
+            cadastrar(tokens, n);
         }
 
         else if (strcmp(tokens[0], "list") == 0)
@@ -294,10 +413,15 @@ int main(int argc, char *argv[])
 
         else if (strcmp(tokens[0], "run") == 0)
         {
+            int modo_pipe = (n >= 2 && strcmp(tokens[1], "pipe") == 0);
             int modo_sequencial = (n >= 2 && strcmp(tokens[1], "sequential") == 0);
             int modo_paralelo = (n >= 2 && strcmp(tokens[1], "parallel") == 0);
 
-            if (modo_sequencial && n >= 3)
+            if (modo_pipe && n >= 4)
+            {
+                executar_pipe(&tokens[2], n - 2);
+            }
+            else if (modo_sequencial && n >= 3)
             {
                 executar_sequencial(&tokens[2], n - 2);
             }
@@ -305,7 +429,7 @@ int main(int argc, char *argv[])
             {
                 executar_paralelo(&tokens[2], n - 2);
             }
-            else if (!modo_sequencial && !modo_paralelo && n == 2)
+            else if (!modo_pipe && !modo_sequencial && !modo_paralelo && n == 2)
             {
                 Tarefa *t = buscar(tokens[1]);
                 if (t == NULL)
@@ -319,7 +443,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                printf("uso: run <tarefa> | run sequential <t1> [t2...] | run parallel <t1> [t2...]");
+                printf("uso: run <tarefa> | run sequential <t1> [t2...] | run parallel <t1> [t2...] | run pipe <t1> <t2> ...\n");
             }
         }
 
@@ -341,14 +465,12 @@ int main(int argc, char *argv[])
                 {
                     free(t->input);
                     t->input = strdup(tokens[2]);
-                    printf("Tarefa '%s': entrada <- %s\n", t->nome, t->input);
                 }
                 else
                 {
                     free(t->output);
                     t->output = strdup(tokens[2]);
                     t->append = (strcmp(tokens[0], "append") == 0);
-                    printf("Tarefa '%s': saida -> %s (%s)\n", t->nome, t->output, t->append ? "append" : "sobrescreve");
                 }
             }
         }
@@ -362,10 +484,6 @@ int main(int argc, char *argv[])
             else if (chdir(tokens[1]) != 0)
             {
                 printf("processflow: diretorio '%s' nao existe ou sem acesso\n", tokens[1]);
-            }
-            else
-            {
-                printf("diretorio de trabalho: %s\n", tokens[1]);
             }
         }
 
