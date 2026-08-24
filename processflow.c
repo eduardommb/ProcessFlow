@@ -353,6 +353,22 @@ int main(int argc, char *argv[])
             }
         }
 
+        else if (strcmp(tokens[0], "workdir") == 0)
+        {
+            if (n != 2)
+            {
+                printf("uso: workdir <diretorio>\n");
+            }
+            else if (chdir(tokens[1]) != 0)
+            {
+                printf("processflow: diretorio '%s' nao existe ou sem acesso\n", tokens[1]);
+            }
+            else
+            {
+                printf("diretorio de trabalho: %s\n", tokens[1]);
+            }
+        }
+
         else
         {
             printf("processflow: comando desconhecido '%s'\n", tokens[0]);
